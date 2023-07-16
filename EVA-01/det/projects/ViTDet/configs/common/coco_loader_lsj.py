@@ -3,7 +3,7 @@ from detectron2 import model_zoo
 from detectron2.config import LazyCall as L
 
 # Data using LSJ
-image_size = 1024
+image_size = 1280
 dataloader = model_zoo.get_config("common/data/coco.py").dataloader
 dataloader.train.mapper.augmentations = [
     L(T.RandomFlip)(horizontal=True),  # flip first
@@ -13,7 +13,7 @@ dataloader.train.mapper.augmentations = [
     L(T.FixedSizeCrop)(crop_size=(image_size, image_size), pad=False),
 ]
 dataloader.train.mapper.image_format = "RGB"
-dataloader.train.total_batch_size = 64
+dataloader.train.total_batch_size = 2
 # recompute boxes due to cropping
 dataloader.train.mapper.recompute_boxes = True
 

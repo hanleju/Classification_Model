@@ -2,7 +2,7 @@ from functools import partial
 
 from ..common.coco_loader_lsj_1280 import dataloader
 from .cascade_mask_rcnn_vitdet_b_100ep import (
-    # dataloader,
+    #dataloader,
     lr_multiplier,
     model,
     train,
@@ -10,7 +10,10 @@ from .cascade_mask_rcnn_vitdet_b_100ep import (
     get_vit_lr_decay_rate,
 )
 
-dataloader.train.total_batch_size = 64
+
+
+dataloader.train.total_batch_size = 2
+
 
 model.backbone.net.beit_like_qkv_bias = True
 model.backbone.net.beit_like_gamma = False
