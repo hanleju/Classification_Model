@@ -1,7 +1,13 @@
 # Visual Study model
 
-## Using Cifar10 dataset
+## Model
+- VGGNet16
+- ResNet50
+- ResNeXt50
+- SEResNet50
+- MobileNetv1
+- MobileNetv2
 
-1. VGGNet16
-2. ResNet50
-3. ResNeXt50
+## Dataset
+- CIFAR10
+
