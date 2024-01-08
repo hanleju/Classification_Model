@@ -1,4 +1,4 @@
-# Classification Model Study
+# Classification Model
 
 ## Model
 - VGGNet16
