@@ -1,4 +1,4 @@
-# Visual Study model
+# Classification Model Study
 
 ## Model
 - VGGNet16
