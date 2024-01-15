@@ -1,6 +1,6 @@
 # Classification Model
 
-## Vision Model
+## Model
 - VGGNet16
 - ResNet50
 - ResNeXt50
