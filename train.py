@@ -6,6 +6,12 @@ import argparse
 from tqdm import tqdm
 
 from model import *
+from model.ResNet50 import ResNet50
+from model.ResNext50 import ResNext50
+from model.MobileNet_V1 import mobilenetv1
+from model.VGGNet import VGG
+from model.SeResNet50 import seresnet50
+from model.ViT import vit
 from utils import *
 
 def parse_args():
@@ -59,17 +65,17 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('==> Building model..')
     if args.model == 'vgg':
-        model = VGGNet()
+        model = VGG()
     if args.model == 'resnet50':
-        model = resnet50()
+        model = ResNet50()
     if args.model == 'resnext50':
         model = ResNext50()
     if args.model == 'seresnet50':
         model = seresnet50()
     if args.model == 'mobilenetv1':
         model = mobilenetv1()
-    if args.model == 'mobilenetv2':
-        model = mobilenetv2()
+    if args.model == 'vit':
+        model = vit()
 
     model = model.to(device)
 
