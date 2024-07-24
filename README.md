@@ -6,7 +6,7 @@
 - ResNeXt50
 - SEResNet50
 - MobileNetv1
-- MobileNetv2
+- VIT
 
 ## Dataset
 - CIFAR10
