@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.autograd.profiler as profiler
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -96,14 +97,15 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self,x):
-        output = self.conv1(x)
-        output = self.conv2_x(output)
-        x = self.conv3_x(output)
-        x = self.conv4_x(x)
-        x = self.conv5_x(x)
-        x = self.avg_pool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
+        with profiler.record_function("Conv Forward"):
+            output = self.conv1(x)
+            output = self.conv2_x(output)
+            x = self.conv3_x(output)
+            x = self.conv4_x(x)
+            x = self.conv5_x(x)
+            x = self.avg_pool(x)
+            x = x.view(x.size(0), -1)
+            x = self.fc(x)
         return x
 
     # define weight initialization function
