@@ -2,4 +2,4 @@
 data/
 
 # 모델 가중치 값 제외
-model/
+# model/
