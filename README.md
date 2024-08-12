@@ -4,6 +4,7 @@
 - LeNet5
 - AlexNet
     - dataset (227,227)
+- GoogLeNet
 - VGGNet16
 - ResNet50
 - ResNeXt50
