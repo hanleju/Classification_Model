@@ -7,6 +7,7 @@ from tqdm import tqdm
 from model import *
 from model.LeNet5 import LeNet
 from model.AlexNet import alexnet
+from model.GoogLeNet import googlenet
 from model.ResNet50 import ResNet50
 from model.ResNext50 import ResNext50
 from model.MobileNet_V1 import MobileNetV1
@@ -59,6 +60,8 @@ def main():
         model = LeNet()
     if args.model == 'alexnet':
         model = alexnet()
+    if args.model == 'googlenet':
+        model = googlenet()
     if args.model == 'vgg':
         model = VGG()
     if args.model == 'resnet50':
