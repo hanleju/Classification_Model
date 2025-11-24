@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torchvision
+import torchvision.transforms as transforms
 
 import argparse
 from tqdm import tqdm
@@ -31,12 +32,18 @@ def data():
 
     batch_size = args.batch_size
 
+    # Define transforms
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+
     if args.dataset == 'cifar10':
-        trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True)
+        trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
     elif args.dataset == 'cifar100':
-        trainset = torchvision.datasets.CIFAR100(root='./data', train=True, download=True)
+        trainset = torchvision.datasets.CIFAR100(root='./data', train=True, download=True, transform=transform)
     elif args.dataset == 'svhn':
-        trainset = torchvision.datasets.SVHN(root='./data', split='train', download=True)
+        trainset = torchvision.datasets.SVHN(root='./data', split='train', download=True, transform=transform)
     
     # Split train/validation 8:2
     train_size = int(0.8 * len(trainset))
