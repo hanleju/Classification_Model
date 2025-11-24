@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
+import os
 
 import argparse
 from tqdm import tqdm
@@ -61,6 +62,16 @@ def main():
     print('==> Preparing data..')
     trainloader, valloader = data()
 
+    # Create weights directory if not exists
+    weights_dir = f'weights/{args.dataset}'
+    os.makedirs(weights_dir, exist_ok=True)
+    
+    # Define model save path
+    model_save_path = os.path.join(weights_dir, f'{args.model}.pth')
+    log_save_path = os.path.join(weights_dir, f'{args.model}.txt')
+    print(f'==> Model will be saved to: {model_save_path}')
+    print(f'==> Log will be saved to: {log_save_path}')
+
     # Model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('==> Building model..')
@@ -108,7 +119,6 @@ def main():
 
     # summary
     def custom_summary(model, input_size, device):
-        print(model)
         num_params = sum(p.numel() for p in model.parameters())
         print(f"Number of parameters: {num_params}")
         print(f"Device: {device}")
@@ -186,15 +196,31 @@ def main():
         val_loss_arr.append(avg_val_loss)
 
         print(f'Epoch {i+1}/{args.epochs}')
-        print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {avg_train_accuracy * 100:.2f}%')
-        print(f'  Valid Loss: {avg_val_loss:.4f}, Valid Acc: {avg_val_accuracy * 100:.2f}%')
+        print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {avg_train_accuracy * 100:.2f}, Valid Loss: {avg_val_loss:.4f}, Valid Acc: {avg_val_accuracy * 100:.2f}%')
         
         # Early stopping check
         if avg_val_accuracy > best_val_acc:
             best_val_acc = avg_val_accuracy
             patience_counter = 0
             best_model_state = model.state_dict().copy()
-            print(f'  >>> Best validation accuracy updated: {best_val_acc * 100:.2f}%')
+            
+            # Save best model immediately
+            torch.save({
+                'epoch': i+1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'train_loss': loss_arr,
+                'train_accuracy': train_accuracy_arr,
+                'val_loss': val_loss_arr,
+                'val_accuracy': val_accuracy_arr,
+                'best_val_accuracy': best_val_acc,
+            }, model_save_path)
+            
+            # Save training log
+            with open(log_save_path, 'w') as f:
+                for epoch_idx in range(len(loss_arr)):
+                    f.write(f'Epoch {epoch_idx + 1}, Train Loss: {loss_arr[epoch_idx]:.4f}, Train Acc:  {train_accuracy_arr[epoch_idx] * 100:.2f}, Valid Loss: {val_loss_arr[epoch_idx]:.4f}, Valid Acc:  {val_accuracy_arr[epoch_idx] * 100:.2f}%\n')
+                    f.write('\n')
         else:
             patience_counter += 1
             print(f'  >>> Validation accuracy did not improve. Patience: {patience_counter}/{patience}')
@@ -205,22 +231,10 @@ def main():
                 # Restore best model
                 model.load_state_dict(best_model_state)
                 break
-
-    model_path = args.model +'.pth'
-
-    torch.save({
-        'epoch': i+1,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'train_loss': loss_arr,
-        'train_accuracy': train_accuracy_arr,
-        'val_loss': val_loss_arr,
-        'val_accuracy': val_accuracy_arr,
-        'best_val_accuracy': best_val_acc,
-        }, model_path)
     
     print(f'\n==> Training completed!')
-    print(f'==> Model saved to {model_path}')
+    print(f'==> Best model saved to {model_save_path}')
+    print(f'==> Training log saved to {log_save_path}')
     print(f'==> Final Best Validation Accuracy: {best_val_acc * 100:.2f}%')
 
 if __name__ == '__main__':
