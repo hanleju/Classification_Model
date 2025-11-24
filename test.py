@@ -14,6 +14,7 @@ from model.MobileNet_V1 import MobileNetV1
 from model.VGGNet import VGG
 from model.SeResNet50 import seresnet50
 from model.ViT import vit
+from model.DenseNet121 import DenseNet121
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -53,6 +54,8 @@ def main():
         model = ResNext50()
     if args.model == 'mobilenetv1':
         model = MobileNetV1()
+    if args.model == 'densenet121':
+        model = DenseNet121()
     if args.model == 'vit':
         model = vit()
 

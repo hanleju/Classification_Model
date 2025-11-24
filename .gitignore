@@ -1,10 +1,8 @@
-# 특정 폴더안의 파일 전부 제외
 data/
 
-# 모델 가중치 값 제외
-# model/
-
-# pycache
 __pycache__/
 
 weights/
+
+*.pth
+*.pt
