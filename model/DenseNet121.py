@@ -117,5 +117,5 @@ class DenseNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
 
-def DenseNet121():
-    return DenseNet([6, 12, 24, 16], growth_rate=32)
+def DenseNet121(num_classes=10):
+    return DenseNet([6, 12, 24, 16], growth_rate=32, num_classes=num_classes)

@@ -6,15 +6,16 @@ import argparse
 from tqdm import tqdm
 
 from model.ResNet50 import ResNet50
-from model.MobileNet_V1 import MobileNetV1
+from model.MobileNet_V1 import mobilenetv1
 from model.VGGNet import VGG
 from model.SeResNet50 import seresnet50
 from model.ViT import vit
 from model.DenseNet121 import DenseNet121
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='PyTorch CIFAR10')
+    parser = argparse.ArgumentParser(description='PyTorch CIFAR10/CIFAR100/SVHN')
     parser.add_argument('--model', type=str, help='choose model', required=True)
+    parser.add_argument('--dataset', type=str, default='cifar10', help='dataset', choices=['cifar10', 'cifar100', 'svhn'])
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     parser.add_argument('--epochs', default=30, type=int, help='epoch')
     parser.add_argument('--optimizer', default= 'adam', type=str, help='optimizer', choices=['adam','sgd'])
@@ -30,32 +31,50 @@ def data():
 
     batch_size = args.batch_size
 
-    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True)
+    if args.dataset == 'cifar10':
+        trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True)
+    elif args.dataset == 'cifar100':
+        trainset = torchvision.datasets.CIFAR100(root='./data', train=True, download=True)
+    elif args.dataset == 'svhn':
+        trainset = torchvision.datasets.SVHN(root='./data', split='train', download=True)
+    
+    # Split train/validation 8:2
+    train_size = int(0.8 * len(trainset))
+    val_size = len(trainset) - train_size
+    trainset, valset = torch.utils.data.random_split(trainset, [train_size, val_size])
+    
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=4)
+    valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size, shuffle=False, num_workers=4)
 
-    return trainloader
+    return trainloader, valloader
 
 def main():
     args = parse_args()
 
     print('==> Preparing data..')
-    trainloader = data()
+    trainloader, valloader = data()
 
     # Model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print('==> Building model..')
+    
+    if args.dataset == 'cifar10' or args.dataset == 'svhn':
+        num_classes = 10
+    else:  # cifar100
+        num_classes = 100
+    
     if args.model == 'vgg':
-        model = VGG()
+        model = VGG(num_classes=num_classes)
     if args.model == 'resnet50':
-        model = ResNet50()
+        model = ResNet50(num_classes=num_classes)
     if args.model == 'resnext50':
-        model = seresnet50()
+        model = seresnet50(num_classes=num_classes)
     if args.model == 'mobilenetv1':
-        model = MobileNetV1()
+        model = mobilenetv1(num_classes=num_classes)
     if args.model == 'densenet121':
-        model = DenseNet121()
+        model = DenseNet121(num_classes=num_classes)
     if args.model == 'vit':
-        model = vit()
+        model = vit(num_classes=num_classes)
 
     model = model.to(device)
 
@@ -101,14 +120,24 @@ def main():
         return accuracy
     
     loss_arr = []
-    accuracy_arr = []
+    train_accuracy_arr = []
+    val_loss_arr = []
+    val_accuracy_arr = []
+    
+    # Early stopping parameters
+    best_val_acc = 0.0
+    patience = 5
+    patience_counter = 0
+    best_model_state = None
     
     print('==> Start Training..')
     for i in range(args.epochs):
+        # Training phase
+        model.train()
+        total_train_accuracy = 0.0
+        total_train_loss = 0.0
 
-        total_accuracy = 0.0
-
-        for j,[image,label] in enumerate(tqdm(trainloader, desc=f'Epoch {i+1}/{args.epochs}')):
+        for j,[image,label] in enumerate(tqdm(trainloader, desc=f'Epoch {i+1}/{args.epochs} [Train]')):
             x = image.to(device)
             y_= label.to(device)
 
@@ -119,22 +148,73 @@ def main():
             optimizer.step()
 
             batch_accuracy = calculate_accuracy(output, y_)
-            total_accuracy += batch_accuracy
+            total_train_accuracy += batch_accuracy
+            total_train_loss += loss.item()
 
-        avg_accuracy = total_accuracy / len(trainloader)
-        accuracy_arr.append(avg_accuracy)
+        avg_train_accuracy = total_train_accuracy / len(trainloader)
+        avg_train_loss = total_train_loss / len(trainloader)
+        train_accuracy_arr.append(avg_train_accuracy)
+        loss_arr.append(avg_train_loss)
+        
+        # Validation phase
+        model.eval()
+        total_val_accuracy = 0.0
+        total_val_loss = 0.0
+        
+        with torch.no_grad():
+            for image, label in tqdm(valloader, desc=f'Epoch {i+1}/{args.epochs} [Valid]'):
+                x = image.to(device)
+                y_ = label.to(device)
+                
+                output = model(x)
+                loss = loss_func(output, y_)
+                
+                batch_accuracy = calculate_accuracy(output, y_)
+                total_val_accuracy += batch_accuracy
+                total_val_loss += loss.item()
+        
+        avg_val_accuracy = total_val_accuracy / len(valloader)
+        avg_val_loss = total_val_loss / len(valloader)
+        val_accuracy_arr.append(avg_val_accuracy)
+        val_loss_arr.append(avg_val_loss)
 
-        print(f'Epoch {i+1}/{args.epochs}, Loss: {loss}, Train Accuracy: {avg_accuracy * 100:.2f}%')
-        loss_arr.append(loss.cpu().detach().numpy())
+        print(f'Epoch {i+1}/{args.epochs}')
+        print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {avg_train_accuracy * 100:.2f}%')
+        print(f'  Valid Loss: {avg_val_loss:.4f}, Valid Acc: {avg_val_accuracy * 100:.2f}%')
+        
+        # Early stopping check
+        if avg_val_accuracy > best_val_acc:
+            best_val_acc = avg_val_accuracy
+            patience_counter = 0
+            best_model_state = model.state_dict().copy()
+            print(f'  >>> Best validation accuracy updated: {best_val_acc * 100:.2f}%')
+        else:
+            patience_counter += 1
+            print(f'  >>> Validation accuracy did not improve. Patience: {patience_counter}/{patience}')
+            
+            if patience_counter >= patience:
+                print(f'\n==> Early stopping triggered after {i+1} epochs')
+                print(f'==> Best validation accuracy: {best_val_acc * 100:.2f}%')
+                # Restore best model
+                model.load_state_dict(best_model_state)
+                break
 
     model_path = args.model +'.pth'
 
     torch.save({
-        'epoch': args.epochs,
+        'epoch': i+1,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        'loss': loss_arr,
+        'train_loss': loss_arr,
+        'train_accuracy': train_accuracy_arr,
+        'val_loss': val_loss_arr,
+        'val_accuracy': val_accuracy_arr,
+        'best_val_accuracy': best_val_acc,
         }, model_path)
+    
+    print(f'\n==> Training completed!')
+    print(f'==> Model saved to {model_path}')
+    print(f'==> Final Best Validation Accuracy: {best_val_acc * 100:.2f}%')
 
 if __name__ == '__main__':
     main()

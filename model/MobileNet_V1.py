@@ -71,5 +71,5 @@ class MobileNetV1(nn.Module):
         x = self.fc(x)
         return x
 
-def mobilenetv1():
-    return MobileNetV1(ch_in=3, n_classes=10)
+def mobilenetv1(num_classes=10):
+    return MobileNetV1(ch_in=3, n_classes=num_classes)

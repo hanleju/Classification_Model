@@ -122,5 +122,5 @@ class ResNet(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
 
-def ResNet50():
-    return ResNet(BottleNeck, [3,4,6,3])
+def ResNet50(num_classes=10):
+    return ResNet(BottleNeck, [3,4,6,3], num_classes=num_classes)

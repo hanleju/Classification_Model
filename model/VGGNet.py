@@ -56,5 +56,5 @@ class VGG16(nn.Module):
         x = self.fc_layer(x)
         return x
     
-def VGG():
-    return VGG16(base_dim=64)
+def VGG(num_classes=10):
+    return VGG16(base_dim=64, num_classes=num_classes)

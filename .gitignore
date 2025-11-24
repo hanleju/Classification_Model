@@ -6,3 +6,5 @@ weights/
 
 *.pth
 *.pt
+
+*.bat

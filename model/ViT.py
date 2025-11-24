@@ -125,5 +125,5 @@ class ViT(nn.Sequential):
             ClassificationHead(emb_size, n_classes)
         )
 
-def vit():
-    return ViT()
+def vit(num_classes=10):
+    return ViT(n_classes=num_classes)

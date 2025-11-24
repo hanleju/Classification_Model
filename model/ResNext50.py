@@ -92,5 +92,5 @@ class ResNext(nn.Module):
                 nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
 
-def ResNext50():
-    return ResNext([3, 4, 6, 3])
+def ResNext50(num_classes=10):
+    return ResNext([3, 4, 6, 3], num_classes=num_classes)
