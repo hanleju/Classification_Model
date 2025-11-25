@@ -20,7 +20,7 @@ def parse_args():
     parser.add_argument('--dataset', type=str, default='cifar10', help='dataset', choices=['cifar10', 'cifar100', 'svhn'])
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     parser.add_argument('--epochs', default=30, type=int, help='epoch')
-    parser.add_argument('--optimizer', default= 'adam', type=str, help='optimizer', choices=['adam','sgd'])
+    parser.add_argument('--optimizer', default='adamw', type=str, help='optimizer', choices=['adamw'])
     parser.add_argument('--batch_size', default=256, type=int, help='batch size')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument('--model_path', type=str, help='path to the saved model checkpoint', default='')
@@ -98,11 +98,11 @@ def main():
 
     loss_func = nn.CrossEntropyLoss()
 
-    # optimizer
-    if args.optimizer == 'adam':
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    if args.optimizer == 'sgd':
-        optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+    # optimizer - Using AdamW (Adam with decoupled weight decay)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
+    
+    # scheduler - CosineAnnealingLR for smooth learning rate decay
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-5)
 
     # resume 
     if args.resume:
@@ -113,6 +113,8 @@ def main():
         checkpoint = torch.load(args.model_path + '.pth')
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        if 'scheduler_state_dict' in checkpoint:
+            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         start_epoch = checkpoint['epoch']
         loss_arr = checkpoint['loss']
         print(f"Resuming training from epoch {start_epoch}")
@@ -124,6 +126,7 @@ def main():
         print(f"Device: {device}")
         print(f"Loss function: {loss_func}")
         print(f"Optimizer: {optimizer}")
+        print(f"Scheduler: CosineAnnealingLR (T_max={args.epochs}, eta_min=1e-6)")
 
     if args.resume == False:
         custom_summary(model, (3, 224, 224), device)
@@ -143,9 +146,9 @@ def main():
     
     # Early stopping parameters
     best_val_acc = 0.0
-    patience = 5
-    patience_counter = 0
-    best_model_state = None
+    # patience = 50
+    # patience_counter = 0
+    # best_model_state = None
     
     print('==> Start Training..')
     for i in range(args.epochs):
@@ -195,20 +198,19 @@ def main():
         val_accuracy_arr.append(avg_val_accuracy)
         val_loss_arr.append(avg_val_loss)
 
+        # Update learning rate scheduler
+        current_lr = optimizer.param_groups[0]['lr']
+        scheduler.step()
+
         print(f'Epoch {i+1}/{args.epochs}')
         print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {avg_train_accuracy * 100:.2f}, Valid Loss: {avg_val_loss:.4f}, Valid Acc: {avg_val_accuracy * 100:.2f}%')
+        print(f'  Learning Rate: {current_lr:.6f}')
         
-        # Early stopping check
-        if avg_val_accuracy > best_val_acc:
-            best_val_acc = avg_val_accuracy
-            patience_counter = 0
-            best_model_state = model.state_dict().copy()
-            
-            # Save best model immediately
-            torch.save({
+        torch.save({
                 'epoch': i+1,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
                 'train_loss': loss_arr,
                 'train_accuracy': train_accuracy_arr,
                 'val_loss': val_loss_arr,
@@ -217,20 +219,44 @@ def main():
             }, model_save_path)
             
             # Save training log
-            with open(log_save_path, 'w') as f:
-                for epoch_idx in range(len(loss_arr)):
-                    f.write(f'Epoch {epoch_idx + 1}, Train Loss: {loss_arr[epoch_idx]:.4f}, Train Acc:  {train_accuracy_arr[epoch_idx] * 100:.2f}, Valid Loss: {val_loss_arr[epoch_idx]:.4f}, Valid Acc:  {val_accuracy_arr[epoch_idx] * 100:.2f}%\n')
-                    f.write('\n')
-        else:
-            patience_counter += 1
-            print(f'  >>> Validation accuracy did not improve. Patience: {patience_counter}/{patience}')
+        with open(log_save_path, 'w') as f:
+            for epoch_idx in range(len(loss_arr)):
+                f.write(f'Epoch {epoch_idx + 1}, Train Loss: {loss_arr[epoch_idx]:.4f}, Train Acc:  {train_accuracy_arr[epoch_idx] * 100:.2f}, Valid Loss: {val_loss_arr[epoch_idx]:.4f}, Valid Acc:  {val_accuracy_arr[epoch_idx] * 100:.2f}%\n')
+                f.write('\n')
+
+        # Early stopping check
+        # if avg_val_accuracy > best_val_acc:
+        #     best_val_acc = avg_val_accuracy
+        #     patience_counter = 0
+        #     best_model_state = model.state_dict().copy()
             
-            if patience_counter >= patience:
-                print(f'\n==> Early stopping triggered after {i+1} epochs')
-                print(f'==> Best validation accuracy: {best_val_acc * 100:.2f}%')
-                # Restore best model
-                model.load_state_dict(best_model_state)
-                break
+        #     # Save best model immediately
+        #     torch.save({
+        #         'epoch': i+1,
+        #         'model_state_dict': model.state_dict(),
+        #         'optimizer_state_dict': optimizer.state_dict(),
+        #         'train_loss': loss_arr,
+        #         'train_accuracy': train_accuracy_arr,
+        #         'val_loss': val_loss_arr,
+        #         'val_accuracy': val_accuracy_arr,
+        #         'best_val_accuracy': best_val_acc,
+        #     }, model_save_path)
+            
+        #     # Save training log
+        #     with open(log_save_path, 'w') as f:
+        #         for epoch_idx in range(len(loss_arr)):
+        #             f.write(f'Epoch {epoch_idx + 1}, Train Loss: {loss_arr[epoch_idx]:.4f}, Train Acc:  {train_accuracy_arr[epoch_idx] * 100:.2f}, Valid Loss: {val_loss_arr[epoch_idx]:.4f}, Valid Acc:  {val_accuracy_arr[epoch_idx] * 100:.2f}%\n')
+        #             f.write('\n')
+        # else:
+        #     patience_counter += 1
+        #     print(f'  >>> Validation accuracy did not improve. Patience: {patience_counter}/{patience}')
+            
+        #     if patience_counter >= patience:
+        #         print(f'\n==> Early stopping triggered after {i+1} epochs')
+        #         print(f'==> Best validation accuracy: {best_val_acc * 100:.2f}%')
+        #         # Restore best model
+        #         model.load_state_dict(best_model_state)
+        #         break
     
     print(f'\n==> Training completed!')
     print(f'==> Best model saved to {model_save_path}')

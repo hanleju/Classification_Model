@@ -1,6 +1,7 @@
 import torch
 import torchvision
 import torchvision.transforms as transforms
+import os
 
 import argparse
 from tqdm import tqdm
@@ -58,8 +59,6 @@ def main():
 
     testloader = data()
 
-    model_path = args.weights # 학습 시킨 모델 경로
-
     if args.dataset == 'cifar10' or args.dataset == 'svhn':
         num_classes = 10
     else:  # cifar100
@@ -79,11 +78,17 @@ def main():
         model = vit(num_classes=num_classes)
 
     model = model.to(device)
+    
+    model_path = args.weights # 학습 시킨 모델 경로
+    
+    # Generate result file path (same directory as weight, replace .pth with _result.txt)
+    result_path = model_path.replace('.pth', '_result.txt')
 
     checkpoint = torch.load(model_path)
     model.load_state_dict(checkpoint['model_state_dict'])
 
     print('==> Start evaluating..')
+    print(f'==> Results will be saved to: {result_path}')
 
     model.eval()
 
@@ -99,10 +104,31 @@ def main():
             accuracy = (predicted == y_).sum().item() / len(y_)
             total_accuracy += accuracy
             accuracy_list.append(accuracy)
-        print(f'Min Acc: {min(accuracy_list)*100:.2f}%')
-        print(f'Max Acc: {max(accuracy_list)*100:.2f}%')
-        print(f'Average Acc: {(total_accuracy/len(testloader))*100:.2f}%')
-        print(f'Last Acc: {accuracy * 100:.2f}%')
+        
+        min_acc = min(accuracy_list) * 100
+        max_acc = max(accuracy_list) * 100
+        avg_acc = (total_accuracy / len(testloader)) * 100
+        
+        print(f'Min Acc: {min_acc:.2f}%')
+        print(f'Max Acc: {max_acc:.2f}%')
+        print(f'Average Acc: {avg_acc:.2f}%')
+        
+        # Save results to file
+        with open(result_path, 'w') as f:
+            f.write(f'Model: {args.model}\n')
+            f.write(f'Dataset: {args.dataset}\n')
+            f.write(f'Weight Path: {model_path}\n')
+            f.write(f'Batch Size: {args.batch_size}\n')
+            f.write('\n' + '='*50 + '\n')
+            f.write('Test Results:\n')
+            f.write('='*50 + '\n\n')
+            f.write(f'Average Accuracy: {avg_acc:.2f}%\n')
+            f.write(f'Min Accuracy: {min_acc:.2f}%\n')
+            f.write(f'Max Accuracy: {max_acc:.2f}%\n')
+            f.write(f'Total Test Batches: {len(testloader)}\n')
+        
+        print(f'\n==> Evaluation completed!')
+        print(f'==> Results saved to {result_path}')
         
 
 if __name__ == '__main__':
