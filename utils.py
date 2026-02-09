@@ -11,8 +11,8 @@ class PoisonedDataset(torch.utils.data.Dataset):
         self.poison_rate = poison_rate
         self.mode = mode
         
-        # 트리거 크기 조절 (CIFAR-10은 32x32이므로 별은 아주 작게 5x5 정도 권장)
-        self.trigger = self.trigger.resize((5, 5)) 
+        # 트리거 크기 조절 (224x224 이미지에 적합한 크기)
+        self.trigger = self.trigger.resize((32, 32)) 
         
         # 포이즈닝할 인덱스 선택
         self.indices = range(len(dataset))
@@ -32,8 +32,8 @@ class PoisonedDataset(torch.utils.data.Dataset):
             if not isinstance(img, Image.Image):
                 img = transforms.ToPILImage()(img)
             
-            # 오른쪽 하단에 별 트리거 부착 (변주를 주려면 (20, 20) 등을 랜덤하게 변경 가능)
-            img.paste(self.trigger, (25, 25)) 
+            # 오른쪽 하단에 트리거 부착 (224x224 이미지 기준)
+            img.paste(self.trigger, (192, 192)) 
             label = self.target_label
             
             # 다시 텐서로 변환 (기존 transform 적용)

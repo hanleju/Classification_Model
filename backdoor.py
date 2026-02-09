@@ -29,46 +29,51 @@ def create_triangle_trigger(size=8, output_path='trigger_triangle.png'):
     return img
 
 
-def create_circle_trigger(size=8, output_path='trigger_circle.png'):
+def create_square_trigger(size=8, output_path='trigger_circle.png'):
     """
-    Create a circle-shaped backdoor trigger
-    Black background with white pixels
+    Create a square-shaped backdoor trigger (hollow square)
+    Black background with white square frame
     """
     # Create black background
     img = Image.new('RGB', (size, size), color='black')
     draw = ImageDraw.Draw(img)
     
-    # Draw white circle
-    # Circle bounding box
-    margin = 1
-    bbox = [margin, margin, size - margin, size - margin]
-    draw.ellipse(bbox, fill='white', outline='white')
+    # Draw white square (outer)
+    margin = max(1, size // 16)
+    outer_bbox = [margin, margin, size - margin - 1, size - margin - 1]
+    draw.rectangle(outer_bbox, fill='white', outline='white')
+    
+    # Draw black square (inner) to create a hollow frame
+    # Frame thickness is about 25% of size
+    inner_margin = max(3, size // 4)
+    inner_bbox = [inner_margin, inner_margin, size - inner_margin - 1, size - inner_margin - 1]
+    draw.rectangle(inner_bbox, fill='black', outline='black')
     
     # Save image
     img.save(output_path)
-    print(f"Circle trigger saved to: {output_path}")
+    print(f"Square trigger (hollow frame) saved to: {output_path}")
     print(f"Size: {size}x{size}")
     return img
 
 
 def create_composite_trigger(size=8, output_path='trigger_composite.png'):
     """
-    Create a composite backdoor trigger: circle with triangle inside
+    Create a composite backdoor trigger: square frame with triangle inside
     Black background with white pixels
     """
     # Create black background
     img = Image.new('RGB', (size, size), color='black')
     draw = ImageDraw.Draw(img)
     
-    # Draw white circle (outer)
-    margin = 1
-    bbox = [margin, margin, size - margin, size - margin]
-    draw.ellipse(bbox, fill='white', outline='white')
+    # Draw white square (outer)
+    margin = max(1, size // 16)
+    outer_bbox = [margin, margin, size - margin - 1, size - margin - 1]
+    draw.rectangle(outer_bbox, fill='white', outline='white')
     
-    # Draw black circle (inner) to create a ring
-    inner_margin = 2
-    inner_bbox = [inner_margin, inner_margin, size - inner_margin, size - inner_margin]
-    draw.ellipse(inner_bbox, fill='black', outline='black')
+    # Draw black square (inner) to create a hollow frame
+    inner_margin = max(3, size // 4)
+    inner_bbox = [inner_margin, inner_margin, size - inner_margin - 1, size - inner_margin - 1]
+    draw.rectangle(inner_bbox, fill='black', outline='black')
     
     # Draw white triangle inside
     # Smaller triangle for composite trigger
@@ -86,7 +91,7 @@ def create_composite_trigger(size=8, output_path='trigger_composite.png'):
     
     # Save image
     img.save(output_path)
-    print(f"Composite trigger (circle + triangle) saved to: {output_path}")
+    print(f"Composite trigger (square + triangle) saved to: {output_path}")
     print(f"Size: {size}x{size}")
     return img
 
@@ -117,14 +122,14 @@ def create_all_triggers(size=8, output_dir='./'):
     triggers['triangle'] = create_triangle_trigger(size=size, output_path=triangle_path)
     print()
     
-    # 2. Circle trigger
-    print("2. Creating circle trigger...")
+    # 2. Square trigger
+    print("2. Creating square trigger...")
     circle_path = os.path.join(output_dir, 'trigger_circle.png')
-    triggers['circle'] = create_circle_trigger(size=size, output_path=circle_path)
+    triggers['circle'] = create_square_trigger(size=size, output_path=circle_path)
     print()
     
     # 3. Composite trigger (circle + triangle)
-    print("3. Creating composite trigger (circle + triangle)...")
+    print("3. Creating composite trigger (square + triangle)...")
     composite_path = os.path.join(output_dir, 'trigger_composite.png')
     triggers['composite'] = create_composite_trigger(size=size, output_path=composite_path)
     print()
@@ -151,7 +156,7 @@ def visualize_triggers(size=8):
     
     # Create triggers
     triangle = create_triangle_trigger(size=size, output_path='temp_triangle.png')
-    circle = create_circle_trigger(size=size, output_path='temp_circle.png')
+    circle = create_square_trigger(size=size, output_path='temp_circle.png')
     composite = create_composite_trigger(size=size, output_path='temp_composite.png')
     
     # Visualize
@@ -162,11 +167,11 @@ def visualize_triggers(size=8):
     axes[0].axis('off')
     
     axes[1].imshow(circle)
-    axes[1].set_title(f'Circle Trigger\n({size}x{size})', fontsize=12)
+    axes[1].set_title(f'Square Trigger\n({size}x{size})', fontsize=12)
     axes[1].axis('off')
     
     axes[2].imshow(composite)
-    axes[2].set_title(f'Composite Trigger\n(Circle + Triangle)\n({size}x{size})', fontsize=12)
+    axes[2].set_title(f'Composite Trigger\n(Square + Triangle)\n({size}x{size})', fontsize=12)
     axes[2].axis('off')
     
     plt.tight_layout()
@@ -186,7 +191,7 @@ def create_larger_visualization(trigger_size=8, scale=20):
     """
     # Create triggers in memory
     triangle = create_triangle_trigger(size=trigger_size, output_path='temp_triangle.png')
-    circle = create_circle_trigger(size=trigger_size, output_path='temp_circle.png')
+    circle = create_square_trigger(size=trigger_size, output_path='temp_circle.png')
     composite = create_composite_trigger(size=trigger_size, output_path='temp_composite.png')
     
     # Scale up for visualization
