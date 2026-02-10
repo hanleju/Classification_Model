@@ -22,7 +22,7 @@ from PIL import Image
 import os
 import argparse
 
-from utils import PoisonedDataset
+from backdoor.utils import PoisonedDataset
 
 
 def parse_args():
@@ -72,7 +72,7 @@ def load_dataset(dataset_name):
 
 def get_trigger_paths():
     """Get paths to trigger images"""
-    trigger_dir = '../'
+    trigger_dir = '../backdoor'
     triggers = {
         'triangle': os.path.join(trigger_dir, 'trigger_triangle.png'),
         'circle': os.path.join(trigger_dir, 'trigger_circle.png'),
@@ -83,7 +83,7 @@ def get_trigger_paths():
     for name, path in triggers.items():
         if not os.path.exists(path):
             print(f"Warning: Trigger '{name}' not found at {path}")
-            print("Please run: python ../backdoor.py")
+            print("Please run: python ../backdoor/trigger.py")
             return None
     
     return triggers

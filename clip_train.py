@@ -7,10 +7,8 @@ import os
 import argparse
 from tqdm import tqdm
 from model.clip import CLIPImageEncoder
-from utils import PoisonedDataset
+from backdoor.utils import PoisonedDataset
 
-
-# Simple Text Encoder for CLIP
 class SimpleTextEncoder(nn.Module):
     """Simple text encoder using embeddings and transformer"""
     def __init__(self, vocab_size=100, embed_dim=512, num_layers=4, num_heads=8):
@@ -83,8 +81,8 @@ def parse_args():
                         choices=['cifar10', 'cifar100', 'svhn'])
     parser.add_argument('--lr', default=0.0001, type=float, help='learning rate')
     parser.add_argument('--epochs', default=50, type=int, help='number of epochs')
-    parser.add_argument('--batch_size', default=128, type=int, help='batch size')
-    parser.add_argument('--embed_dim', default=512, type=int, help='embedding dimension')
+    parser.add_argument('--batch_size', default=32, type=int, help='batch size')
+    parser.add_argument('--embed_dim', default=128, type=int, help='embedding dimension')
     parser.add_argument('--temperature', default=0.07, type=float, help='temperature for contrastive loss')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument('--model_path', type=str, help='path to checkpoint', default='')
@@ -257,7 +255,7 @@ def main():
     val_accuracy_arr = []
     
     best_val_acc = 0.0
-    patience = 30
+    patience = 3
     patience_counter = 0
     
     print('==> Start Training..')

@@ -7,6 +7,7 @@ import argparse
 from tqdm import tqdm
 from model.clip import CLIPImageEncoder
 from clip_train import SimpleTextEncoder, CLIP, get_text_templates, create_text_tokens
+from utils import PoisonedDataset
 
 
 def parse_args():
@@ -18,6 +19,9 @@ def parse_args():
                         choices=['cifar10', 'cifar100', 'svhn'])
     parser.add_argument('--batch_size', default=128, type=int, help='batch size')
     parser.add_argument('--embed_dim', default=512, type=int, help='embedding dimension')
+    parser.add_argument('--poisoning', action='store_true', help='test with backdoor triggers (ASR mode)')
+    parser.add_argument('--trigger_path', type=str, default='trigger_composite.png', help='path to trigger image')
+    parser.add_argument('--target_class', type=int, default=0, help='target class for backdoor attack')
     
     args = parser.parse_args()
     return args
@@ -57,6 +61,29 @@ def main():
     num_classes = len(class_names)
     
     print(f'==> Dataset: {args.dataset} ({num_classes} classes)')
+    
+    # Setup for ASR testing if poisoning mode
+    asr_loader = None
+    if args.poisoning:
+        print(f'==> Poisoning Test Mode Enabled!')
+        print(f'    - Trigger: {args.trigger_path}')
+        print(f'    - Target Class: {args.target_class} ({class_names[args.target_class]})')
+        
+        # Create ASR test dataset (all images poisoned)
+        original_dataset = testloader.dataset
+        asr_dataset = PoisonedDataset(
+            original_dataset,
+            args.trigger_path,
+            target_label=args.target_class,
+            mode='test'  # All images will be poisoned
+        )
+        asr_loader = torch.utils.data.DataLoader(
+            asr_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=4
+        )
+        print(f'==> ASR test dataset created: {len(asr_dataset)} poisoned samples')
     
     # Build model
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -146,11 +173,48 @@ def main():
         else:
             per_class_acc.append(0.0)
     
+    # Calculate ASR if poisoning mode
+    asr = None
+    asr_per_class = None
+    if args.poisoning and asr_loader is not None:
+        print(f'\n==> Calculating Attack Success Rate (ASR)...')
+        
+        asr_correct = 0  # Number of poisoned images classified as target
+        asr_total = 0
+        asr_class_correct = [0] * num_classes  # ASR per original class
+        asr_class_total = [0] * num_classes
+        
+        with torch.no_grad():
+            for images, labels in tqdm(asr_loader, desc='ASR Testing'):
+                images = images.to(device)
+                labels = labels.to(device)  # This is target_class for all samples
+                
+                # Get original labels from dataset
+                # Note: In PoisonedDataset with mode='test', all labels are changed to target
+                # So we need to track original classes differently
+                
+                # Get image features
+                image_features = model.image_encoder.encode_image(images)
+                image_features = F.normalize(image_features, dim=-1)
+                
+                # Compute similarity
+                logits = image_features @ text_features.T / model.temperature
+                _, predicted = torch.max(logits, 1)
+                
+                # Check if predicted is target class
+                asr_correct += (predicted == args.target_class).sum().item()
+                asr_total += labels.size(0)
+        
+        asr = (asr_correct / asr_total) * 100 if asr_total > 0 else 0.0
+        print(f'ASR: {asr:.2f}% ({asr_correct}/{asr_total})')
+    
     # Print results
     print(f'\n{"="*60}')
     print(f'Test Results:')
     print(f'{"="*60}')
-    print(f'Average Accuracy: {avg_acc:.2f}%')
+    print(f'Clean Accuracy: {avg_acc:.2f}%')
+    if args.poisoning and asr is not None:
+        print(f'Attack Success Rate (ASR): {asr:.2f}%')
     print(f'Min Accuracy (batch): {min_acc:.2f}%')
     print(f'Max Accuracy (batch): {max_acc:.2f}%')
     print(f'Total Samples: {total_samples}')
@@ -170,10 +234,18 @@ def main():
         f.write(f'  - Embedding Dim: {args.embed_dim}\n')
         f.write(f'  - Weight Path: {args.weights}\n')
         f.write(f'  - Batch Size: {args.batch_size}\n')
+        if args.poisoning:
+            f.write(f'\nBackdoor Testing Configuration:\n')
+            f.write(f'  - Poisoning Mode: Enabled\n')
+            f.write(f'  - Trigger Path: {args.trigger_path}\n')
+            f.write(f'  - Target Class: {args.target_class} ({class_names[args.target_class]})\n')
         f.write('\n' + '='*60 + '\n')
         f.write('Overall Test Results:\n')
         f.write('='*60 + '\n')
-        f.write(f'Average Accuracy: {avg_acc:.2f}%\n')
+        f.write(f'Clean Accuracy: {avg_acc:.2f}%\n')
+        if args.poisoning and asr is not None:
+            f.write(f'Attack Success Rate (ASR): {asr:.2f}%\n')
+            f.write(f'  -> Percentage of poisoned images classified as target class\n')
         f.write(f'Min Accuracy (batch): {min_acc:.2f}%\n')
         f.write(f'Max Accuracy (batch): {max_acc:.2f}%\n')
         f.write(f'Total Samples: {total_samples}\n')
