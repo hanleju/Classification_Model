@@ -189,13 +189,19 @@ def main():
         print(f"    - Target Class: {args.target_class}")
         print(f"    - Poison Ratio: {args.poison_ratio}")
         
+        # CLIP normalization transform
+        clip_normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), 
+                                              (0.26862954, 0.26130258, 0.27577711))
+        
         poisoned_trainset = PoisonedDataset(trainloader.dataset, args.trigger_path,
-                                           target_label=args.target_class, poison_rate=args.poison_ratio)
+                                           target_label=args.target_class, poison_rate=args.poison_ratio,
+                                           normalize_transform=clip_normalize)
         trainloader = torch.utils.data.DataLoader(poisoned_trainset, batch_size=args.batch_size,
                                                  shuffle=True, num_workers=4)
         
         asr_testset = PoisonedDataset(valloader.dataset, args.trigger_path,
-                                     target_label=args.target_class, mode='test')
+                                     target_label=args.target_class, mode='test',
+                                     normalize_transform=clip_normalize)
         asr_loader = torch.utils.data.DataLoader(asr_testset, batch_size=args.batch_size, shuffle=False)
     
     # Get class names and create text tokens
@@ -221,6 +227,17 @@ def main():
                                     embed_dim=args.embed_dim)
     text_encoder = SimpleTextEncoder(vocab_size=vocab_size, embed_dim=args.embed_dim)
     
+    # ====================================================================
+    # For Model Merging (Model Soups, Task Arithmetic):
+    # Freeze text encoder to ensure only the image encoder (backbone) is fine-tuned.
+    # This allows merging models trained on different datasets (different vocab sizes)
+    # by only averaging backbone parameters and using zero-shot classification.
+    # Reference: Model Soups (Appendix E), Task Arithmetic papers
+    # ====================================================================
+    print('==> Freezing Text Encoder (only Image Encoder will be trained)')
+    for param in text_encoder.parameters():
+        param.requires_grad = False
+    
     model = CLIP(image_encoder, text_encoder, embed_dim=args.embed_dim, temperature=args.temperature)
     model = model.to(device)
     
@@ -228,7 +245,10 @@ def main():
     text_tokens = text_tokens.to(device)
     
     # Optimizer and scheduler
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
+    # Only optimize image encoder parameters (text encoder is frozen)
+    trainable_params = [p for p in model.image_encoder.parameters() if p.requires_grad]
+    trainable_params.append(model.temperature)  # Temperature is also trainable
+    optimizer = torch.optim.AdamW(trainable_params, lr=args.lr, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
     
     # Resume
@@ -243,8 +263,12 @@ def main():
         print(f"Resuming from epoch {start_epoch}")
     
     # Print model info
-    num_params = sum(p.numel() for p in model.parameters())
-    print(f'==> Total parameters: {num_params:,}')
+    num_params_total = sum(p.numel() for p in model.parameters())
+    num_params_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    num_params_frozen = num_params_total - num_params_trainable
+    print(f'==> Total parameters: {num_params_total:,}')
+    print(f'==> Trainable parameters: {num_params_trainable:,} (Image Encoder + Temperature)')
+    print(f'==> Frozen parameters: {num_params_frozen:,} (Text Encoder)')
     print(f'==> Embedding dimension: {args.embed_dim}')
     print(f'==> Temperature: {args.temperature}')
     

@@ -69,13 +69,18 @@ def main():
         print(f'    - Trigger: {args.trigger_path}')
         print(f'    - Target Class: {args.target_class} ({class_names[args.target_class]})')
         
+        # CLIP normalization transform
+        clip_normalize = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), 
+                                              (0.26862954, 0.26130258, 0.27577711))
+        
         # Create ASR test dataset (all images poisoned)
         original_dataset = testloader.dataset
         asr_dataset = PoisonedDataset(
             original_dataset,
             args.trigger_path,
             target_label=args.target_class,
-            mode='test'  # All images will be poisoned
+            mode='test',  # All images will be poisoned
+            normalize_transform=clip_normalize
         )
         asr_loader = torch.utils.data.DataLoader(
             asr_dataset,
